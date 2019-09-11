@@ -102,7 +102,7 @@ if [ $? -eq 0 ]; then
 fi
 
 echo "Extracting $C_VER..."
-tar -xf $C_FN -C $RAW_DL_CACHE
+tar -xf $C_FN -C $BIN_CACHE_DIR
 
 if [ $? -ne 0 ]; then
 	echo "failed to extract the archive"
