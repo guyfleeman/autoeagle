@@ -166,7 +166,7 @@ for v in "${GEN_VERSIONS[@]}"; do
 		export DEBEMAIL=$MAINTAINER_EMAIL
 		export DEBFULLNAME=$MAINTAINER_NAME
 		echo "running dh_make. It may take a few moments to create the compressed archive."
-		dh_make --copyright custom --copyrightfile $LICENSE --single --createorig --yes
+		dh_make --copyright custom --copyrightfile $LICENSE --indep --createorig --yes
 		echo "done."
 		res="$?"
 
@@ -178,6 +178,98 @@ for v in "${GEN_VERSIONS[@]}"; do
 		else
 			echo "created debain staging control files for $v"
 		fi
+	else
+		echo "debian staging already compelete for $v"
+	fi
+
+	if [ ! -f $DEB_STAGED_BIN_DIR/install ]; then
+		echo "no install file in debian control"
+
+		echo "will build recursively..."
+		CUR_DIR=`pwd`
+		cd $PKG_CACHE_STAGING_DIR
+		# shellcheck disable=SC2086
+		ALL_FILES=$(find $VER_PKG_NAME -type f)
+		if [ $? -ne 0 ]; then
+			echo "failed to enumerate files"
+			exit 1
+		fi
+
+		# load all files into an array for patching, override IFS to skip spaces
+		# ths fucking examples directory has folders with spaces, so we gotta handle that
+		declare -a all_files_arr
+		IFS=$'\n' read -d '' -r -a all_files_arr <<< $ALL_FILES
+
+    # stripping TLDs
+    echo "fixing TLDs"
+		for i in "${!all_files_arr[@]}"; do
+			all_files_arr[$i]="$(echo "${all_files_arr[$i]}" | sed -e "s/$VER_PKG_NAME\///g")"
+		done
+
+    # patching spaces
+    echo "fixing illegal folders for debian install"
+		for i in "${!all_files_arr[@]}"; do
+			all_files_arr[$i]="$(echo "${all_files_arr[$i]}" | sed -e "s/ /?/g")"
+		done
+
+    echo "remove meta/control files"
+    declare -a install_files_arr
+		for patched_fn in "${all_files_arr[@]}"; do
+		  if [[ $patched_fn != "debian"* ]]; then
+		    install_files_arr+=("$patched_fn")
+		  fi
+		done
+
+    echo "install files:"
+		for patched_fn in "${install_files_arr[@]}"; do
+			echo -e "\t$patched_fn"
+		done
+
+    echo "building debian install entries"
+    declare -a deb_inst_entries
+		for patched_fn in "${install_files_arr[@]}"; do
+		  inst_loc=$PKG_INST_PREFIX/$VER_PKG_NAME/$(dirname "$patched_fn")
+			install_ent="$patched_fn  $inst_loc"
+			echo -e "\t$install_ent"
+			deb_inst_entries+=("$install_ent")
+		done
+
+		DEB_INSTALL_FILE=${VER_PKG_NAME}/debian/install
+		touch "$DEB_INSTALL_FILE"
+		if [ $? -ne 0 ]; then
+			echo "failed to create install manifest file"
+			exit 1
+		fi
+
+		#find $VER_PKG_NAME -type f | grep -xv "$VER_PKG_NAME" | sed -e "s/$VER_PKG_NAME\///g" | grep -v "debian" | sed -r "s/ /?/g" | sed "s/\$/  $PKG_INST_PREFIX\/$VER_PKG_NAME/" > ${VER_PKG_NAME}/debian/install
+
+		echo "clearing install file"
+		echo "" > "$DEB_INSTALL_FILE"
+		for inst_ent in "${deb_inst_entries[@]}"; do
+		  echo "$inst_ent" >> "$DEB_INSTALL_FILE"
+		done
+
+		#if [ $? -ne 0 ]; then
+		#	echo "failed to generate the install manifest"
+		#	exit 1
+		#else
+		#	echo "created the install manifest in debian control"
+		#fi
+
+		cd "$VER_PKG_NAME" || exit
+		echo "gen deb"
+		debuild -us -uc
+
+		if [ $? -ne 0 ]; then
+			echo "failed to generate deb file"
+			rm "debian/install"
+		fi
+
+    unset all_files_arr
+    unset install_files_arr
+    unset deb_inst_entries
+
+		cd $CUR_DIR
 	fi
 
 	#INST_DIR=${PKG_INST_PREFIX}/${PKG_NAME}
