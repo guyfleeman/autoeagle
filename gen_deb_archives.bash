@@ -161,7 +161,7 @@ for v in "${GEN_VERSIONS[@]}"; do
 		echo "creating..."
 	
 		CUR_DIR=`pwd`
-		cd $STAGING_DIR
+		cd "$STAGING_DIR" || exit
 	
 		export DEBEMAIL=$MAINTAINER_EMAIL
 		export DEBFULLNAME=$MAINTAINER_NAME
@@ -170,7 +170,7 @@ for v in "${GEN_VERSIONS[@]}"; do
 		echo "done."
 		res="$?"
 
-		cd $CUR_DIR
+		cd "$CUR_DIR" || exit
 
 		if [ $res -ne 0 ]; then
 			echo "failed to create debian staging control files for $v"
@@ -186,8 +186,8 @@ for v in "${GEN_VERSIONS[@]}"; do
 		echo "no install file in debian control"
 
 		echo "will build recursively..."
-		CUR_DIR=`pwd`
-		cd $PKG_CACHE_STAGING_DIR
+		CUR_DIR=$(pwd)
+		cd $PKG_CACHE_STAGING_DIR || exit
 		# shellcheck disable=SC2086
 		ALL_FILES=$(find $VER_PKG_NAME -type f)
 		if [ $? -ne 0 ]; then
@@ -269,7 +269,7 @@ for v in "${GEN_VERSIONS[@]}"; do
     unset install_files_arr
     unset deb_inst_entries
 
-		cd $CUR_DIR
+		cd "$CUR_DIR" || exit
 	fi
 
 	#INST_DIR=${PKG_INST_PREFIX}/${PKG_NAME}
